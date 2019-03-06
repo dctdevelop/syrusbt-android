@@ -3,14 +3,12 @@ package com.dctdevelop.syrusbtjavaexample;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
@@ -18,23 +16,16 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.location.Location;
-import android.location.LocationManager;
 import android.os.AsyncTask;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.TextView;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -51,9 +42,9 @@ public class MainActivity extends AppCompatActivity {
     Context context;
     BluetoothGatt gattDevice;
     BluetoothGattCharacteristic toWriteCharacteristic;
-    UUID uuid = UUID.fromString("00000000-dc70-0080-dc70-a07ba85ee4d6");
-    UUID uuid2 = UUID.fromString("00000000-dc70-0180-dc70-a07ba85ee4d6");
-    UUID uuid3 = UUID.fromString("00000000-dc70-0280-dc70-a07ba85ee4d6");
+    UUID serviceUUID = UUID.fromString("00000000-dc70-0080-dc70-a07ba85ee4d6");
+    UUID charascteristicUUIDCommands = UUID.fromString("00000000-dc70-0180-dc70-a07ba85ee4d6");
+    UUID charasteristicUUIDEvents = UUID.fromString("00000000-dc70-0280-dc70-a07ba85ee4d6");
     private final static int REQUEST_ENABLE_BT = 1;
     private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
 
@@ -94,11 +85,13 @@ public class MainActivity extends AppCompatActivity {
 
 
 
+        // Getting the bluetooth adapter and Scanner
         btManager = (BluetoothManager)getSystemService(Context.BLUETOOTH_SERVICE);
         btAdapter = btManager.getAdapter();
         btScanner = btAdapter.getBluetoothLeScanner();
 
 
+        // starting bluetooth
         if (btAdapter != null && !btAdapter.isEnabled()) {
             Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableIntent,REQUEST_ENABLE_BT);
@@ -124,10 +117,16 @@ public class MainActivity extends AppCompatActivity {
     private ScanCallback leScanCallback = new ScanCallback() {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
+            // Filtering devices who the name contains Syrus
             if(result.getDevice().getName() != null && result.getDevice().getName().contains("Syrus")){
                 peripheralTextView.append("Device Name: " + result.getDevice().getName() + " rssi: " + result.getRssi() + "\n");
+                // Conencting after detect  first Syrus Device
                 btScanner.stopScan(leScanCallback);
+                /*
+                    connectCallback: the function defines all the callbacks for handle all the operations related to BLE
+                 */
                 result.getDevice().connectGatt(context,true,connectCallback);
+
                 final int scrollAmount = peripheralTextView.getLayout().getLineTop(peripheralTextView.getLineCount()) - peripheralTextView.getHeight();
                 // if there is no need to scroll, scrollAmount will be <=0
                 if (scrollAmount > 0) {
@@ -139,17 +138,23 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    // Connect callback function for BLE operations
     private BluetoothGattCallback  connectCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
             Log.d("ble", "status:" + status);
             if(newState == 2) {
+                // Connection Stablished
                 peripheralTextView.append("Connected to Device: " + gatt.getDevice().getName() + "\n");
                 gattDevice = gatt;
+                /*
+                    Discovering services this is an optional step if you know all the services and characteristics
+                 */
                 gatt.discoverServices();
             }
             if(newState == 0) {
+                // Connection Lost
                 peripheralTextView.append("Disconnected from Device: " + gatt.getDevice().getName() + "\n");
             }
 
@@ -158,32 +163,42 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
+
+            //  List Services show in logs
             List<BluetoothGattService> list = gatt.getServices();
             for (int i =0; i < list.size(); i++){
                 Log.d("service  ", "service: "+ list.get(i).getUuid());
                 peripheralTextView.append("Service " + i +": " + list.get(i).getUuid()  + "\n");
             }
-            List<BluetoothGattCharacteristic> list2 = gatt.getService(uuid).getCharacteristics();
+            // List characteristics for the Command Service
+            List<BluetoothGattCharacteristic> list2 = gatt.getService(serviceUUID).getCharacteristics();
             for (int j =0; j < list2.size(); j++){
                 Log.d("characteristic  ", "characteristic: "+ list2.get(j).getUuid());
                 peripheralTextView.append("Characteristic " + j +": " + list2.get(j).getUuid()  + "\n");
             }
 
-            BluetoothGattCharacteristic characteristic =  gatt.getService(uuid).getCharacteristic(uuid2);
-            toWriteCharacteristic = gatt.getService(uuid).getCharacteristic(uuid2);
+            // Setting the Command Characteristic in write mode
+            BluetoothGattCharacteristic characteristic =  gatt.getService(serviceUUID).getCharacteristic(charascteristicUUIDCommands);
+            toWriteCharacteristic = gatt.getService(serviceUUID).getCharacteristic(charascteristicUUIDCommands);
             characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
 
+            //  Subscribing to notifications change for the characteristic to get the response from commands
             gatt.setCharacteristicNotification(characteristic, true);
+
+            // This is required to  enable notification on the characteristic, this is only requires for android y BLE communications
+            // may not work without this
             BluetoothGattDescriptor descriptor = characteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"));
             descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
             gatt.writeDescriptor(descriptor);
 
             peripheralTextView.append("writing Characteristic "+ characteristic.getUuid() + "\n");
-            characteristic.setValue(">SBIK09792<".getBytes());
+
+            // Sending The SBIK Authentication command, this is the first command that should be sent
+            characteristic.setValue((">SBIK"+ gatt.getDevice().getName().substring(11) + "<").getBytes());
             gatt.writeCharacteristic(characteristic);
 
-
             /**
+             // This allows you to see the descriptor for one characteristic. almost never used
             List<BluetoothGattDescriptor> list3 = characteristic.getDescriptors();
             for (int k =0; k < list3.size(); k++){
                 Log.d("descriptor  ", "descriptor: "+ list3.get(k).getUuid());
@@ -203,6 +218,12 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
+            /*
+                getting the response from syrus everytime the characteristc changes
+                the value  is in `characteristic.getStringValue(0)`
+                A complete command  from syrus starts with `>` and ends with `<` and can be received in multiple
+                characteristics Write/Read. Developer should buffer the response and wait for `<` to process the value
+             */
             Log.d("changeChar", "onCharacteristicChanged: " + characteristic.getStringValue(0));
             peripheralTextView.append("DATA: " + characteristic.getStringValue(0)+"\n");
 
@@ -273,6 +294,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void sendText(){
+        // Minimum logic to send a command
+        // The comamnds must start with `>` and ends with `<`
+
         String text = texter.getText().toString();
         toWriteCharacteristic.setValue((">"+text.toUpperCase()+"<").getBytes());
         gattDevice.writeCharacteristic(toWriteCharacteristic);
