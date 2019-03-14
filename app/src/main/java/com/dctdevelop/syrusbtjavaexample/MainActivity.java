@@ -36,12 +36,15 @@ public class MainActivity extends AppCompatActivity {
     BluetoothLeScanner btScanner;
     Button startScanningButton;
     Button stopScanningButton;
+    Button subscribeToEventsButton;
     Button sendButton;
     EditText texter;
+    String buffer = "";
     TextView peripheralTextView;
     Context context;
     BluetoothGatt gattDevice;
     BluetoothGattCharacteristic toWriteCharacteristic;
+    BluetoothGattCharacteristic toEventCharacteristic;
     UUID serviceUUID = UUID.fromString("00000000-dc70-0080-dc70-a07ba85ee4d6");
     UUID charascteristicUUIDCommands = UUID.fromString("00000000-dc70-0180-dc70-a07ba85ee4d6");
     UUID charasteristicUUIDEvents = UUID.fromString("00000000-dc70-0280-dc70-a07ba85ee4d6");
@@ -74,6 +77,14 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         stopScanningButton.setVisibility(View.INVISIBLE);
+
+        subscribeToEventsButton = (Button) findViewById(R.id.SubscribeToEventsButton);
+        subscribeToEventsButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                subscribeToEvents();
+            }
+        });
+        subscribeToEventsButton.setVisibility(View.INVISIBLE);
 
         sendButton = (Button) findViewById(R.id.sendButton);
         sendButton.setOnClickListener(new View.OnClickListener() {
@@ -148,6 +159,7 @@ public class MainActivity extends AppCompatActivity {
                 // Connection Stablished
                 peripheralTextView.append("Connected to Device: " + gatt.getDevice().getName() + "\n");
                 gattDevice = gatt;
+                subscribeToEventsButton.setVisibility(View.VISIBLE);
                 /*
                     Discovering services this is an optional step if you know all the services and characteristics
                  */
@@ -155,6 +167,7 @@ public class MainActivity extends AppCompatActivity {
             }
             if(newState == 0) {
                 // Connection Lost
+                subscribeToEventsButton.setVisibility(View.INVISIBLE);
                 peripheralTextView.append("Disconnected from Device: " + gatt.getDevice().getName() + "\n");
             }
 
@@ -164,6 +177,7 @@ public class MainActivity extends AppCompatActivity {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
 
+            /**
             //  List Services show in logs
             List<BluetoothGattService> list = gatt.getServices();
             for (int i =0; i < list.size(); i++){
@@ -176,11 +190,14 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("characteristic  ", "characteristic: "+ list2.get(j).getUuid());
                 peripheralTextView.append("Characteristic " + j +": " + list2.get(j).getUuid()  + "\n");
             }
+             **/
+
 
             // Setting the Command Characteristic in write mode
             BluetoothGattCharacteristic characteristic =  gatt.getService(serviceUUID).getCharacteristic(charascteristicUUIDCommands);
             toWriteCharacteristic = gatt.getService(serviceUUID).getCharacteristic(charascteristicUUIDCommands);
             characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+
 
             //  Subscribing to notifications change for the characteristic to get the response from commands
             gatt.setCharacteristicNotification(characteristic, true);
@@ -190,8 +207,6 @@ public class MainActivity extends AppCompatActivity {
             BluetoothGattDescriptor descriptor = characteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"));
             descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
             gatt.writeDescriptor(descriptor);
-
-            peripheralTextView.append("writing Characteristic "+ characteristic.getUuid() + "\n");
 
             // Sending The SBIK Authentication command, this is the first command that should be sent
             characteristic.setValue((">SBIK"+ gatt.getDevice().getName().substring(11) + "<").getBytes());
@@ -204,7 +219,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("descriptor  ", "descriptor: "+ list3.get(k).getUuid());
                 peripheralTextView.append("descriptor " + k +": " + list3.get(k).getUuid()  + "\n");
             }**/
-
 
 
         }
@@ -225,18 +239,20 @@ public class MainActivity extends AppCompatActivity {
                 characteristics Write/Read. Developer should buffer the response and wait for `<` to process the value
              */
             Log.d("changeChar", "onCharacteristicChanged: " + characteristic.getStringValue(0));
-            peripheralTextView.append("DATA: " + characteristic.getStringValue(0)+"\n");
+
+            buffer +=  characteristic.getStringValue(0);
+            if(buffer.endsWith("<") || buffer.endsWith("\n") || buffer.endsWith("\r")){
+                peripheralTextView.append("DATA: " + buffer +"\n");
+                buffer = "";
+            }
 
         }
-
-        /**
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             super.onDescriptorWrite(gatt, descriptor, status);
-            Log.d("DescriptorWrite", "onDescriptorWrite: " + descriptor.getValue());
+            Log.d("DescriptorWrite", "onDescriptorWrite: " + descriptor.getValue() + " in characteristic " + descriptor.getCharacteristic().getUuid());
             gatt.readCharacteristic(toWriteCharacteristic);
         }
-        **/
     };
 
 
@@ -267,11 +283,20 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void subscribeToEvents(){
+        toEventCharacteristic = gattDevice.getService(serviceUUID).getCharacteristic(charasteristicUUIDEvents);
+        BluetoothGattDescriptor descriptorEv =  toEventCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"));
+        descriptorEv.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+        gattDevice.writeDescriptor(descriptorEv);
+        gattDevice.setCharacteristicNotification(toEventCharacteristic, true);
+    }
+
     public void startScanning() {
         System.out.println("start scanning");
         peripheralTextView.setText("");
         startScanningButton.setVisibility(View.INVISIBLE);
         stopScanningButton.setVisibility(View.VISIBLE);
+
         AsyncTask.execute(new Runnable() {
             @Override
             public void run() {

@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
     tools:context="com.dctdevelop.syrusbtjavaexample.MainActivity">
 
     <TextView
@@ -24,6 +26,14 @@
         android:layout_height="50dp"
         android:text="Stop Scanning"
         android:id="@+id/StopScanButton"
+        android:layout_marginTop="40dp"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="50dp"
+        android:text="Subscribe to Events"
+        android:id="@+id/SubscribeToEventsButton"
+        android:layout_marginLeft="150dp"
         android:layout_marginTop="40dp"/>
 
     <TextView
