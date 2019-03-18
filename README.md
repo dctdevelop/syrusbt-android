@@ -25,4 +25,4 @@ An android device with bluetooth >= 4.0
 - Send a TAIP message to a device
 - Subscribe to events
 
-[Screenshoot](screenshot.jpg)
+<img src="screenshot.jpg" style="max-height:400px;text-align:center;margin-left:33%">
