@@ -17,3 +17,12 @@ An android device with bluetooth >= 4.0
 #### [Bluetooth low energy overview](https://developer.android.com/guide/topics/connectivity/bluetooth-le)
 
 #### [Android Things - Communicating with Bluetooth Low Energy devices](http://nilhcem.com/android-things/bluetooth-low-energy)
+
+## Features
+
+- Scan Syrus devices
+- Authenticate and connect to a device
+- Send a TAIP message to a device
+- Subscribe to events
+
+[Screenshoot](screenshot.jpg)
